@@ -60,8 +60,9 @@ def find_otp(text):
     return None
 
 def wait_for_otp(sid):
-    max_attempts = 30
-    for attempt in range(max_attempts):
+    max_wait_time = 300  # 5 minutes in seconds
+    start_time = time.time()
+    while time.time() - start_time < max_wait_time:
         r = check_mail(sid)
         if r and 'list' in r and r['list']:
             for msg in r['list']:
@@ -106,7 +107,7 @@ def create_driver():
 
 # --- Main automation loop ---
 REGISTRATION_LINK = "https://hyper3d.ai/r/E9B2STV3"  # Change as needed
-PARALLEL_BROWSERS = 5  # Safe for GitHub Actions runner
+PARALLEL_BROWSERS = 4  # Changed to 4 parallel Chrome instances
 
 def run_automation(run_id):
     print(f"\n--- Automation Run {run_id} ---")
@@ -185,20 +186,20 @@ def run_automation(run_id):
         if driver:
             driver.quit()
 
-# --- Dynamic pool: always 5 running ---
-# def dynamic_pool():
-#     run_id = 1
-#     with ThreadPoolExecutor(max_workers=PARALLEL_BROWSERS) as executor:
-#         futures = {executor.submit(run_automation, run_id + i): run_id + i for i in range(PARALLEL_BROWSERS)}
-#         run_id += PARALLEL_BROWSERS
-#         while True:
-#             done, _ = wait(futures, return_when=FIRST_COMPLETED)
-#             for fut in done:
-#                 # Remove completed future
-#                 futures.pop(fut)
-#                 # Start a new one
-#                 futures[executor.submit(run_automation, run_id)] = run_id
-#                 run_id += 1
+# --- Dynamic pool: always 4 running ---
+def dynamic_pool():
+    run_id = 1
+    with ThreadPoolExecutor(max_workers=PARALLEL_BROWSERS) as executor:
+        futures = {executor.submit(run_automation, run_id + i): run_id + i for i in range(PARALLEL_BROWSERS)}
+        run_id += PARALLEL_BROWSERS
+        while True:
+            done, _ = wait(futures, return_when=FIRST_COMPLETED)
+            for fut in done:
+                # Remove completed future
+                futures.pop(fut)
+                # Start a new one
+                futures[executor.submit(run_automation, run_id)] = run_id
+                run_id += 1
 
 if __name__ == "__main__":
-    run_automation(1)
+    dynamic_pool()
